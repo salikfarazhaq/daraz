@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daraz Agent Score Calculator</title>
+<link rel="icon" type="image/png" href="https://i.postimg.cc/hv0ShtXj/images.png">
+<style>
+  :root {
+    --daraz: #F85606;
+    --daraz-glow: rgba(248, 86, 6, 0.35);
+    --bg: #0d0604;
+    --card: rgba(22, 10, 5, 0.85);
+    --border: rgba(248, 86, 6, 0.2);
+    --text: #ffffff;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Calibri', sans-serif;
+    font-weight: 700; /* Calibri Bold */
+    color: var(--text);
+    background: var(--bg);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  #bg-canvas { position: fixed; inset: 0; z-index: 0; width: 100%; height: 100%; }
+
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 1.5rem 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* --- Top Bar --- */
+  .top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0;
+  }
+  .daraz-logo { height: 45px; filter: drop-shadow(0 2px 10px var(--daraz-glow)); }
+  .admin-btn {
+    background: rgba(248,86,6,0.1);
+    border: 1.5px solid var(--daraz);
+    border-radius: 10px;
+    padding: 10px 18px;
+    color: #fff;
+    cursor: pointer;
+    font-family: 'Calibri', sans-serif;
+    font-weight: 700;
+    transition: 0.3s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .admin-btn:hover { background: var(--daraz); }
+
+  /* --- Header --- */
+  header { text-align: center; margin-bottom: 2rem; }
+  .site-badge {
+    display: inline-block; background: rgba(248,86,6,0.1); border: 1px solid var(--daraz);
+    border-radius: 99px; padding: 5px 16px; font-size: 11px; color: var(--daraz);
+    text-transform: uppercase; margin-bottom: 1rem;
+  }
+  header h1 { font-size: 42px; margin-bottom: 5px; }
+  header p { color: rgba(255,255,255,0.6); font-weight: 400; font-size: 14px; }
+
+  /* --- Targets Dashboard --- */
+  .target-banner {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 1.5rem;
+  }
+  .target-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 15px 20px; display: flex; align-items: center; gap: 15px; backdrop-filter: blur(10px);
+  }
+  .t-icon { width: 40px; height: 40px; background: rgba(248,86,6,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .t-label { font-size: 11px; color: var(--daraz); text-transform: uppercase; }
+  .t-name { font-size: 14px; margin: 2px 0; }
+  .t-pct { font-size: 24px; color: var(--daraz); margin-left: auto; }
+  
+  .legend { display: flex; gap: 8px; font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 5px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+  /* --- Tabs --- */
+  .tabs { display: flex; gap: 10px; margin-bottom: 1.5rem; }
+  .tab {
+    flex: 1; padding: 14px; border: none; border-radius: 12px;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3);
+    font-weight: 700; cursor: pointer; font-size: 16px;
+  }
+  .tab.active { background: var(--daraz); color: #fff; box-shadow: 0 4px 15px var(--daraz-glow); }
+
+  /* --- Panel & Cards --- */
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn 0.4s ease; }
+  .section-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 25px; backdrop-filter: blur(15px);
+  }
+  .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .ltb-badge { text-align: right; background: rgba(0,0,0,0.3); padding: 10px 20px; border-radius: 12px; border: 1px solid var(--border); }
+  .ltb-val { font-size: 32px; color: var(--daraz); line-height: 1; }
+
+  /* --- Table --- */
+  .sheet-wrap { overflow-x: auto; margin-bottom: 20px; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; min-width: 500px; }
+  th { background: rgba(248,86,6,0.1); padding: 12px; font-size: 12px; color: var(--daraz); text-transform: uppercase; }
+  td { padding: 15px; text-align: center; border-top: 1px solid var(--border); }
+  .pill { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .pill-pos { background: rgba(34,197,94,0.15); color: var(--green); }
+  .pill-neg { background: rgba(239,68,68,0.15); color: var(--red); }
+  
+  input[type="number"] {
+    width: 80px; background: #000; border: 1.5px solid var(--border);
+    border-radius: 8px; color: #fff; padding: 8px; text-align: center;
+    font-family: inherit; font-weight: 700; font-size: 18px;
+  }
+  input:focus { border-color: var(--daraz); outline: none; }
+
+  /* --- Result Strip --- */
+  .result-strip {
+    display: flex; justify-content: space-between; align-items: center;
+    background: rgba(0,0,0,0.3); padding: 20px; border-radius: 15px; gap: 15px;
+  }
+  .rs-item { text-align: center; }
+  .rs-item span { display: block; font-size: 10px; color: gray; margin-bottom: 5px; }
+  .rs-item b { font-size: 22px; }
+
+  .feedback-msg { padding: 12px; border-radius: 10px; font-size: 13px; text-align: center; margin-top: 15px; display: none; border: 1px solid; }
+
+  /* --- MODALS --- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1000;
+    display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px);
+  }
+  .modal { background: #150a05; border: 2.5px solid var(--daraz); padding: 35px; border-radius: 25px; width: 95%; max-width: 420px; position: relative; }
+  .modal h2 { text-align: center; color: var(--daraz); margin-bottom: 25px; }
+  .modal label { display: block; margin-bottom: 8px; font-size: 13px; color: #aaa; }
+  .modal input { width: 100%; padding: 14px; margin-bottom: 20px; border-radius: 10px; border: 1px solid var(--border); background: #000; color: #fff; font-weight: 700; font-size: 16px; }
+  .save-btn { width: 100%; padding: 16px; background: var(--daraz); border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 18px; cursor: pointer; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  footer { text-align: center; padding: 40px; color: #333; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="container">
+  <div class="top-bar">
+    <img src="https://i.postimg.cc/hv0ShtXj/images.png" alt="Daraz" class="daraz-logo">
+    <button class="admin-btn" onclick="openLogin()">
+      <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm2-3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/></svg>
+      Administration
+    </button>
+  </div>
+
+  <header>
+    <div class="site-badge">⭐ Customer Support</div>
+    <h1>Agent Score Calculator</h1>
+    <p>Enter your ratings — score will be calculated automatically</p>
+  </header>
+
+  <!-- Targets Dashboard -->
+  <div class="target-banner">
+    <div class="target-box">
+      <div class="t-icon">💬</div>
+      <div>
+        <div class="t-label">Live Chat Target</div>
+        <div class="t-name" id="lc-req-txt">91% Required</div>
+        <div class="legend">
+          <span><b class="dot" style="background:var(--green)"></b> On Target</span>
+          <span><b class="dot" style="background:var(--yellow)"></b> Near</span>
+        </div>
+      </div>
+      <div class="t-pct" id="disp-lc">91.00%</div>
+    </div>
+    <div class="target-box">
+      <div class="t-icon">📞</div>
+      <div>
+        <div class="t-label">Inbound Target</div>
+        <div class="t-name" id="ib-req-txt">97% Required</div>
+        <div class="legend">
+          <span><b class="dot" style="background:var(--green)"></b> On Target</span>
+          <span><b class="dot" style="background:var(--yellow)"></b> Near</span>
+        </div>
+      </div>
+      <div class="t-pct" id="disp-ib">97.00%</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-lc" onclick="showPanel('lc', this)">💬 Live Chat</button>
+    <button class="tab" id="tab-ib" onclick="showPanel('ib', this)">📞 Inbound</button>
+  </div>
+
+  <!-- Panel: LC -->
+  <div id="panel-lc" class="panel active">
+    <div class="section-card">
+      <div class="card-header">
+        <div><h2>Live Chat Rating</h2><p style="font-size:12px;color:gray;font-weight:400;">Enter your ratings below</p></div>
+        <div class="ltb-badge">
+          <div style="font-size:10px;color:gray;text-transform:uppercase;">Your Score</div>
+          <div class="ltb-val" id="lc-big-score">0.00%</div>
+        </div>
+      </div>
+      <div class="sheet-wrap">
+        <table>
+          <thead><tr><th>Excellent</th><th>Good</th><th>Normal</th><th>UnSatisfy</th><th>V.UnSatisfy</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="emoji">🤩</span></td><td><span class="emoji">😊</span></td><td><span class="emoji">😐</span></td><td><span class="emoji">😞</span></td><td><span class="emoji">😡</span></td>
+            </tr>
+            <tr>
+              <td><span class="pill pill-pos">Positive</span></td><td><span class="pill pill-pos">Positive</span></td><td><span class="pill pill-neg">Negative</span></td><td><span class="pill pill-neg">Negative</span></td><td><span class="pill pill-neg">Negative</span></td>
+            </tr>
+            <tr>
+              <td><input type="number" id="lc-e" oninput="calcLC()"></td>
+              <td><input type="number" id="lc-g" oninput="calcLC()"></td>
+              <td><input type="number" id="lc-n" oninput="calcLC()"></td>
+              <td><input type="number" id="lc-b" oninput="calcLC()"></td>
+              <td><input type="number" id="lc-vb" oninput="calcLC()"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="result-strip">
+        <div class="rs-item"><span>POSITIVE</span><b id="lc-pos" style="color:var(--green)">0</b></div>
+        <div class="rs-item"><span>NEGATIVE</span><b id="lc-neg" style="color:var(--red)">0</b></div>
+        <div class="rs-item"><span>TOTAL</span><b id="lc-total">0</b></div>
+      </div>
+      <div id="lc-msg" class="feedback-msg"></div>
+    </div>
+  </div>
+
+  <!-- Panel: IB -->
+  <div id="panel-ib" class="panel">
+    <div class="section-card">
+      <div class="card-header">
+        <div><h2>Inbound Rating</h2><p style="font-size:12px;color:gray;font-weight:400;">Enter 1 to 5 star counts</p></div>
+        <div class="ltb-badge">
+          <div style="font-size:10px;color:gray;text-transform:uppercase;">Your Score</div>
+          <div class="ltb-val" id="ib-big-score">0.00%</div>
+        </div>
+      </div>
+      <div class="sheet-wrap">
+        <table>
+          <thead><tr><th>Rating 1</th><th>Rating 2</th><th>Rating 3</th><th>Rating 4</th><th>Rating 5</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="emoji">😡</span></td><td><span class="emoji">😞</span></td><td><span class="emoji">😐</span></td><td><span class="emoji">😊</span></td><td><span class="emoji">🤩</span></td>
+            </tr>
+            <tr>
+              <td><span class="pill pill-neg">Negative</span></td><td><span class="pill pill-neg">Negative</span></td><td><span class="pill pill-neg">Negative</span></td><td><span class="pill pill-pos">Positive</span></td><td><span class="pill pill-pos">Positive</span></td>
+            </tr>
+            <tr>
+              <td><input type="number" id="ib-1" oninput="calcIB()"></td>
+              <td><input type="number" id="ib-2" oninput="calcIB()"></td>
+              <td><input type="number" id="ib-3" oninput="calcIB()"></td>
+              <td><input type="number" id="ib-4" oninput="calcIB()"></td>
+              <td><input type="number" id="ib-5" oninput="calcIB()"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="result-strip">
+        <div class="rs-item"><span>POSITIVE</span><b id="ib-pos" style="color:var(--green)">0</b></div>
+        <div class="rs-item"><span>NEGATIVE</span><b id="ib-neg" style="color:var(--red)">0</b></div>
+        <div class="rs-item"><span>TOTAL</span><b id="ib-total">0</b></div>
+      </div>
+      <div id="ib-msg" class="feedback-msg"></div>
+    </div>
+  </div>
+
+  <footer>Daraz Customer Support Team &bull; Official System &bull; 2025</footer>
+</div>
+
+<!-- Modal: Login -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal">
+    <h2>Admin Login</h2>
+    <input type="password" id="pass-field" placeholder="Enter Password">
+    <button class="save-btn" onclick="verifyAdmin()">Unlock</button>
+    <button onclick="closeModal('modal-login')" style="background:none;border:none;color:gray;width:100%;margin-top:15px;cursor:pointer;">Cancel</button>
+  </div>
+</div>
+
+<!-- Modal: Admin -->
+<div class="modal-overlay" id="modal-admin">
+  <div class="modal">
+    <h2>Update Targets</h2>
+    <p style="color:gray;font-size:12px;text-align:center;margin-bottom:20px;">Changes apply to ALL agents instantly.</p>
+    <label>Live Chat Target %</label><input type="number" id="set-lc" step="0.01">
+    <label>Inbound Target %</label><input type="number" id="set-ib" step="0.01">
+    <label>New Admin Email</label><input type="email" id="set-email" placeholder="example@daraz.pk">
+    <button class="save-btn" id="sync-btn" onclick="saveToCloud()">Save & Sync Everywhere</button>
+    <button onclick="closeModal('modal-admin')" style="background:none;border:none;color:gray;width:100%;margin-top:15px;cursor:pointer;">Close</button>
+  </div>
+</div>
+
+<script>
+// --- GLOBAL SYNC ENGINE (NPOINT) ---
+const DB_URL = "https://api.npoint.io/33682910793740268c5b";
+let config = { lc: 91.00, ib: 97.00, admins: [] };
+
+async function fetchCloud() {
+  try {
+    const res = await fetch(DB_URL + "?t=" + Date.now());
+    const data = await res.json();
+    if(data.lc) { config = data; updateUI(); }
+  } catch(e) {}
+}
+
+async function saveToCloud() {
+  const btn = document.getElementById('sync-btn');
+  btn.innerText = "Syncing..."; btn.disabled = true;
+  const newData = {
+    lc: parseFloat(document.getElementById('set-lc').value) || 91.00,
+    ib: parseFloat(document.getElementById('set-ib').value) || 97.00,
+    admins: config.admins
+  };
+  let email = document.getElementById('set-email').value.trim().toLowerCase();
+  if(email && !newData.admins.includes(email)) newData.admins.push(email);
+
+  try {
+    await fetch(DB_URL, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(newData) });
+    config = newData; updateUI(); closeModal('modal-admin'); alert("SUCCESS: Targets updated globally!");
+  } catch(e) { alert("Error syncing."); }
+  finally { btn.innerText = "Save & Sync Everywhere"; btn.disabled = false; }
+}
+
+function updateUI() {
+  document.getElementById('disp-lc').innerText = config.lc.toFixed(2) + "%";
+  document.getElementById('disp-ib').innerText = config.ib.toFixed(2) + "%";
+  document.getElementById('lc-req-txt').innerText = Math.floor(config.lc) + "% Required";
+  document.getElementById('ib-req-txt').innerText = Math.floor(config.ib) + "% Required";
+  document.getElementById('set-lc').value = config.lc;
+  document.getElementById('set-ib').value = config.ib;
+  calcLC(); calcIB();
+}
+
+// UI Logic
+function showPanel(id, btn) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('panel-'+id).classList.add('active');
+}
+
+function getV(id) { return parseFloat(document.getElementById(id).value) || 0; }
+
+function calcLC() {
+  let pos = getV('lc-e') + getV('lc-g');
+  let total = pos + getV('lc-n') + getV('lc-b') + getV('lc-vb');
+  let score = total > 0 ? (pos / total * 100) : 0;
+  document.getElementById('lc-big-score').innerText = score.toFixed(2) + "%";
+  document.getElementById('lc-pos').innerText = pos;
+  document.getElementById('lc-neg').innerText = total - pos;
+  document.getElementById('lc-total').innerText = total;
+  const msg = document.getElementById('lc-msg');
+  if(total > 0) {
+    msg.style.display = 'block';
+    if(score < config.lc) {
+      let r = Math.ceil((config.lc * total - 100 * pos) / (100 - config.lc));
+      msg.style.borderColor = "rgba(239,68,68,0.3)"; msg.style.color = "var(--red)";
+      msg.innerHTML = `⚠️ Below Target! You need <b>${r}</b> more Positive ratings to reach <b>${config.lc}%</b>`;
+    } else {
+      msg.style.borderColor = "rgba(34,197,94,0.3)"; msg.style.color = "var(--green)";
+      msg.innerHTML = "🎯 Target Achieved! Great work.";
+    }
+  } else msg.style.display = 'none';
+}
+
+function calcIB() {
+  let pos = getV('ib-4') + getV('ib-5');
+  let total = pos + getV('ib-1') + getV('ib-2') + getV('ib-3');
+  let score = total > 0 ? (pos / total * 100) : 0;
+  document.getElementById('ib-big-score').innerText = score.toFixed(2) + "%";
+  document.getElementById('ib-pos').innerText = pos;
+  document.getElementById('ib-neg').innerText = total - pos;
+  document.getElementById('ib-total').innerText = total;
+  const msg = document.getElementById('ib-msg');
+  if(total > 0) {
+    msg.style.display = 'block';
+    if(score < config.ib) {
+      let r = Math.ceil((config.ib * total - 100 * pos) / (100 - config.ib));
+      msg.style.borderColor = "rgba(239,68,68,0.3)"; msg.style.color = "var(--red)";
+      msg.innerHTML = `⚠️ Below Target! You need <b>${r}</b> more Positive ratings to reach <b>${config.ib}%</b>`;
+    } else {
+      msg.style.borderColor = "rgba(34,197,94,0.3)"; msg.style.color = "var(--green)";
+      msg.innerHTML = "🎯 Target Achieved! Keep it up.";
+    }
+  } else msg.style.display = 'none';
+}
+
+function openLogin() { document.getElementById('modal-login').style.display='flex'; }
+function closeModal(id) { document.getElementById(id).style.display='none'; }
+function verifyAdmin() {
+  const p = document.getElementById('pass-field').value;
+  if(p === "Daraz@123" || config.admins.includes(p.toLowerCase())) {
+    closeModal('modal-login'); document.getElementById('modal-admin').style.display='flex';
+  } else alert("Wrong!");
+}
+
+// Background Animation
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let w, h, dots = [];
+function initBG() {
+  w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight;
+  dots = []; for(let i=0; i<40; i++) dots.push({x:Math.random()*w, y:Math.random()*h, vx:Math.random()-0.4, vy:Math.random()-0.4});
+}
+function drawBG() {
+  ctx.fillStyle = "#0d0604"; ctx.fillRect(0,0,w,h);
+  ctx.fillStyle = "rgba(248,86,6,0.15)";
+  dots.forEach(d => { d.x+=d.vx; d.y+=d.vy; if(d.x<0||d.x>w) d.vx*=-1; if(d.y<0||d.y>h) d.vy*=-1; ctx.beginPath(); ctx.arc(d.x,d.y,2,0,Math.PI*2); ctx.fill(); });
+  requestAnimationFrame(drawBG);
+}
+window.onresize = initBG; initBG(); drawBG();
+
+setInterval(fetchCloud, 15000);
+fetchCloud();
+</script>
+
+</body>
+</html>
